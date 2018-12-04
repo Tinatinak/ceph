@@ -85,4 +85,3 @@ class Summary(BaseController):
             result = self._has_permissions(Permission.DELETE, Scope.RBD_IMAGE)
 
         return result
-        
