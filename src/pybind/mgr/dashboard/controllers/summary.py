@@ -44,14 +44,45 @@ class Summary(BaseController):
     @Endpoint()
     def __call__(self):
         executing_t, finished_t = TaskManager.list_serializable()
+        executing_tasks = []
+        for t in executing_t:
+            if self.validate_task_permissions(t['name']):
+                executing_tasks.append(t)
+        finished_tasks = []
+        for t in finished_t:
+            if self.validate_task_permissions(t['name']):
+                finished_tasks.append(t)
+
         result = {
             'health_status': self._health_status(),
             'mgr_id': mgr.get_mgr_id(),
             'have_mon_connection': mgr.have_mon_connection(),
-            'executing_tasks': executing_t,
-            'finished_tasks': finished_t,
+            'executing_tasks': executing_tasks,
+            'finished_tasks': finished_tasks,
             'version': mgr.version
         }
         if self._has_permissions(Permission.READ, Scope.RBD_MIRRORING):
             result['rbd_mirroring'] = self._rbd_mirroring()
         return result
+
+    def validate_task_permissions(self, name):
+        result = True
+        if name == 'pool/create':
+            result = self._has_permissions(Permission.CREATE, Scope.POOL)
+        elif name == 'pool/edit':
+            result = self._has_permissions(Permission.UPDATE, Scope.POOL)
+        elif name == 'pool/delete':
+            result = self._has_permissions(Permission.DELETE, Scope.POOL)
+        elif name in [
+                'rbd/create', 'rbd/copy', 'rbd/flatten',
+                'rbd/snap/create', 'rbd/clone', 'rbd/snap/rollback',
+                'rbd/trash/move', 'rbd/trash/restore', 'rbd/trash/purge'
+            ]:
+            result = self._has_permissions(Permission.CREATE, Scope.RBD_IMAGE)
+        elif name in ['rbd/edit', 'rbd/snap/edit']:
+            result = self._has_permissions(Permission.UPDATE, Scope.RBD_IMAGE)
+        elif name in ['rbd/delete', 'rbd/snap/delete', 'rbd/trash/remove']:
+            result = self._has_permissions(Permission.DELETE, Scope.RBD_IMAGE)
+
+        return result
+        
